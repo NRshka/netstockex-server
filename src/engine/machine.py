@@ -177,3 +177,36 @@ class Router(Machine):
         except KeyError:
             time_now: str = datetime.now().strftime("%d-%m-%Y/%H:%M")
             self.log.append(f'[{time_now}] No connected device at {dg} interface')
+
+
+class PostServer(Machine):
+    '''
+    '''
+    def __init__(self):
+        super().__init__(self, hz: int, threads: int, ram_mem: int,
+                storage_mem: int, storage_speed: int, net_speed: int,
+                name: Optional[str] = None):
+
+        self.Letter = namedtuple('Letter', 'title sender recipient text date')
+
+
+    @overrides
+    def take_packet(self, packet: dict):
+        '''
+        Take packet in form of post mail
+        If protocol not corfimed log it
+        '''
+        #if it isn't recipient drop packet
+        port: int = int(packet['to_port'])
+        if packet['to_ip'] != self.ip_addr or self.ports[port] is None:
+            return
+
+        things: List[bytes] = packet['data'].split(b'\0')
+        title: str = str(things[0], 'utf-8')
+        sender: str = str(things[1], 'utf-8')
+        recipient: str = str(things[2], 'utf-8')
+        text: str = str(things[3], 'utf-8')
+        date: str = str(things[4], 'utf-8')
+        
+        new_letter = self.Letter(title, sender, recipient, text, date)
+        self.mail.append(new_letter)
