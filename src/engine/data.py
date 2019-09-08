@@ -3,8 +3,39 @@
 которые используются как исходный материал для вычислений на аукционе
 @author ADT
 '''
+#TODO typing.Dict
 import random
 import string
+from typing import Optional
+
+
+class Packet:
+    def __init__(self, ready_packet: Optional[dict]=None, data: Optional[bytes]=None,
+                from_ip: Optional[str]=None, from_port: Optional[str]=None,
+                dest_ip: Optional[str]=None, dest_port: Optional[str]=None):
+        if ready_packet:
+            self.from_ip: str = ready_packet['from_ip']
+            self.from_port: str = ready_packet['from_port']
+            self.to_ip: str = ready_packet['to_ip']
+            self.to_port: str = ready_packet['to_port']
+            self.data: bytes = ready_packet['data']
+        else:
+            assert data and from_port and from_ip and dest_port and dest_ip, 'Need all items'
+            self.from_ip: str = from_ip
+            self.to_ip: str = dest_ip
+            self.from_port: str = from_port
+            self.to_port: str = dest_port
+            self.data: bytes = data
+
+
+    def __str__(self):
+        string_form = f'Source ip: {self.from_ip}\n\rSource port: {self.from_port}\n\r'
+        string_form += f'Destination ip: {self.to_ip}\n\rDestination port: {self.to_port}\n\r'
+        string_form += f'{self.data}'
+        return string_form
+
+
+
 
 
 def random_name(minl: int = 2, maxl: int = 15) -> str:

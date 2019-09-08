@@ -27,7 +27,7 @@ def compare_ip(ip_net: List[int], mask_net: List[int], dest_ip: List[int]) -> bo
         return False
 
     for ip_part, mask_part, dest_part in zip(ip_net, mask_net, dest_ip):
-        if dest_part & mask_part != ip_part:
+        if dest_part & mask_part != ip_part & mask_part:
             return False
 
     return True
@@ -39,7 +39,11 @@ class Machine:
     '''
     # pylint: disable=too-many-instance-attributes
     def __init__(self, hz: int, threads: int, ram_mem: int,
-                storage_mem: int, storage_speed: int, net_speed: int):
+                storage_mem: int, storage_speed: int, net_speed: int,
+                name: Optional[str] = None):
+        
+        self.name = name
+
         assert hz > 0
         assert threads > 0
         assert ram_mem > 0
@@ -88,7 +92,16 @@ class Machine:
         '''
 
         port = packet['to_port']
+        print(self.name, ':')
+        print(packet)
         #if self.ports[]
+
+
+    def send_packet(self, packet: dict):
+        '''
+        Low-level method shouldn't be used by users
+        '''
+        self.gateway.take_packet(packet)
 
 
     def add_program(self, data, program: list) -> int:

@@ -51,6 +51,7 @@ class Socket:
         packet['from_port'] = computer.port
         packet['to_ip'] = ip
         packet['to_port'] = port
+        #packet['data'] = 
 
         computer.interfaces.sendto(packet, ip, port)
         return 0
