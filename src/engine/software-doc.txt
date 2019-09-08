@@ -1,0 +1,25 @@
+Commands:
+ - NETWORK:
+    Packet(args) - создаёт пакет с заполненными полями. Например:
+      Packet(auth='0xudf287h', key=123, stamp='12m13d') создаёт пакет
+      auth:0xudf287h|key:123|stamp:12m13d
+    
+    Socket(port: int) - создаёт объект сокета на заданном порту. Если не удалось (например, порт занят),
+    возвращает отрицательное число
+
+    Socket.sendto(Packet, address: string, port: int) - отправляет пакет типа Packet по указанному адресу типа string, int
+      pct = Packet(auth='0xudf287h', key=123)
+      sendto(pct, '10.12.250.148', 1935)
+    
+    Socket.recvfrom(max_bytes: int) - принимает пакет, возвращает адрес (string, int) и Packet. Например:
+      address, port, pct = Socket.recvfrom(512)
+  - File IO:
+    fopen(filename: string, mode: string) - открывает файл с указанным модификатором,
+    возвражает объект File
+
+    File.close() - закрывает доступ к файлу.
+
+    File.read(num_chars: optional int) - возвращает строку длиной min(num_chars, длина файла). Если параметр
+    не указан, считывает всю длину файла. Перемещает указатель чтения.
+
+    File.write(string)
