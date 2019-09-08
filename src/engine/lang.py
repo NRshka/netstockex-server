@@ -5,7 +5,7 @@
 from dataclasses import dataclass
 
 
-from machine import *
+from .machine import *
 
 
 

@@ -1,6 +1,5 @@
 # import asyncio
 import threading
-import docstring
 from socket import socket, AF_INET, SOCK_DGRAM
 #
 #
