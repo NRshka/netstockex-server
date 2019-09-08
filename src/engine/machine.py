@@ -183,11 +183,9 @@ class PostServer(Machine):
     '''
     '''
     def __init__(self):
-        super().__init__(self, hz: int, threads: int, ram_mem: int,
-                storage_mem: int, storage_speed: int, net_speed: int,
-                name: Optional[str] = None):
-
-        self.Letter = namedtuple('Letter', 'title sender recipient text date')
+        super().__init__(21*1e5, 1, 1024, 10240, 8*1024*100, 80*1024**3)
+        self.Letter = namedtuple('Letter', 'status title sender recipient text date')
+        self.mail = []
 
 
     @overrides
@@ -202,11 +200,15 @@ class PostServer(Machine):
             return
 
         things: List[bytes] = packet['data'].split(b'\0')
-        title: str = str(things[0], 'utf-8')
-        sender: str = str(things[1], 'utf-8')
-        recipient: str = str(things[2], 'utf-8')
-        text: str = str(things[3], 'utf-8')
-        date: str = str(things[4], 'utf-8')
+        try:
+            title: str = str(things[0], 'utf-8')
+            sender: str = str(things[1], 'utf-8')
+            recipient: str = str(things[2], 'utf-8')
+            text: str = str(things[3], 'utf-8')
+            date: str = str(things[4], 'utf-8')
+        except IndexError:
+            #error in protocol, drop
+            return
         
-        new_letter = self.Letter(title, sender, recipient, text, date)
+        new_letter = self.Letter('new', title, sender, recipient, text, date)
         self.mail.append(new_letter)
