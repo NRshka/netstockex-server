@@ -33,6 +33,38 @@ def compare_ip(ip_net: List[int], mask_net: List[int], dest_ip: List[int]) -> bo
     return True
 
 
+def apply_mask(ip_net: List[int], net_mask: List[int]) -> List[int]:
+    '''
+    Apply mask to ip address
+    @params
+    ip_net: ip address of computer
+    net_mask: mask of network
+    @returns
+    ip address of network
+    '''
+    assert len(ip_net) == len(net_mask)
+    net_addr: List[int] = [a&b for a, b in zip(ip_net, net_mask)]
+    return net_addr 
+
+
+def get_new_ip(net_addr: List[int], count: int) -> List[int]:
+    assert count > 0 
+
+    new_addr: List[int] = [i for i in net_addr]
+    number: int = count
+    ind: int = len(net_addr) - 1
+    while number > 0:
+        new_addr[ind] += number % 255
+        if new_addr[ind] > 254:
+            new_addr[ind - 1] += new_addr[ind] // 254
+            new_addr[ind] = new_addr[ind] % 254
+
+        ind -= 1
+        number = number // 255
+
+    return new_addr
+
+
 class Machine:
     '''
     Clss of user machine to do any calculations
@@ -63,7 +95,7 @@ class Machine:
         self.queue: List[list] = []
 
 
-    def set_net_data(self, ip_addr: List[str], net_mask: List[int], gateway, ipv6=None):
+    def set_net_data(self, ip_addr: List[int], net_mask: List[int], gateway, ipv6=None):
         '''
 
         '''
@@ -177,6 +209,65 @@ class Router(Machine):
         except KeyError:
             time_now: str = datetime.now().strftime("%d-%m-%Y/%H:%M")
             self.log.append(f'[{time_now}] No connected device at {dg} interface')
+
+
+class Switcher(Machine):
+    '''
+    Switcher to route packets in subnetwork
+    '''
+    def __init__(self, net_addr: List[int], net_mask: List[int], name: Optional[str]=None):
+        super().__init__(21*1e5, 1, 1024, 10240, 8*1024*100, 80*1024**3, name=name)
+        self.switch_table = {}#'192.168.1.92': 'eth1' form
+        self.interfaces_table = {}#matchnig interface name string and Machine class
+        self.log: List[str] = []#errors
+        self.net_addr: List[int] = net_addr
+        self.net_mask: List[int] = net_mask
+        self.count_devices = 0#count of connected devices
+        
+        self.max_devices = -2#cause first address is the address of network, last is broadcast
+        for ind, item in enumerate(reversed(self.net_mask)):
+            self.max_devices += (item^255)*(255**(ind+1))
+        assert self.max_devices >= 0, 'incorrect net mask'
+
+
+    @overrides
+    def set_gateway(self, gateway):
+        self.gateway = gateway
+
+
+    @overrides
+    def take_packet(self, packet: dict):
+        try:
+            ip_addr: str = packet['to_ip']
+            interface: str = self.switch_table[ip_addr]
+            device = self.interfaces_table[interface]
+            device.take_packet(packet)
+        except KeyError:
+            #send to default gateway
+            self.gateway.take_packet(packet)
+            #time_now: str = datetime.now().strftime("%d-%m-%Y/%H:%M")
+            #self.log.append(f'[{time_now}] No connected device or wrong packet')
+
+
+    def connect_machine(self, interface: str, device: Machine, ip: Optional[str] = None) -> int:
+        '''
+        Если задан ip, не меняет насроет подключаемой машины,
+        предполагаеся, что раз уж задаёте - сами настроили
+        Иначе настраиваее машину, выдавая ip and net mask
+        Returns status code
+        '''
+        #TODO отключить машину по ту сторону провода от этой
+        if self.count_devices > self.max_devices:
+            return -1
+        self.interfaces_table[interface] = device
+        if ip is None:
+            new_ip: List[int] = get_new_ip(self.net_addr, self.count_devices + 1)
+            strfip: str = '.'.join([str(i) for i in new_ip])
+            self.switch_table[strfip] = interface
+            device.set_net_data(new_ip, self.net_mask, self)
+        else:
+            self.switch_table[ip] = interface
+        self.count_devices += 1
 
 
 class PostServer(Machine):
