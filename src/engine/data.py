@@ -7,6 +7,7 @@
 import random
 import string
 from typing import Optional
+from dataclasses import dataclass
 
 
 class Packet:
@@ -35,7 +36,21 @@ class Packet:
         return string_form
 
 
+@dataclass
+class Letter:
+    title: str
+    sender: str
+    recipient: str
+    text: str
+    date: str
 
+    def __str__(self):
+        strf: str = ''
+        for key in self.__dict__:
+            strf += self.__dict__[key]
+            strf += '\0'
+
+        return strf
 
 
 def random_name(minl: int = 2, maxl: int = 15) -> str:
