@@ -113,7 +113,7 @@ class Machine:
         self.gateway = gateway
 
 
-    def take_packet(self, packet: dict):
+    def take_packet(self, packet: dict, test_dict: Optional[dict]=None):
         '''
         If destination ip is there, send packet to
         a socket associated with the port of destination
@@ -126,14 +126,16 @@ class Machine:
         port = packet['to_port']
         print(self.name, ':')
         print(packet)
+        test_dict['packet'] = packet
+        test_dict['recipient'] = self
         #if self.ports[]
 
 
-    def send_packet(self, packet: dict):
+    def send_packet(self, packet: dict, test_dict: Optional[dict]=None):
         '''
         Low-level method shouldn't be used by users
         '''
-        self.gateway.take_packet(packet)
+        self.gateway.take_packet(packet, test_dict)
 
 
     def add_program(self, data, program: list) -> int:
@@ -179,7 +181,7 @@ class Router(Machine):
 
 
     @overrides
-    def take_packet(self, packet: dict):
+    def take_packet(self, packet: dict, test_dict: Optional[dict]=None):
         '''
         Find packet and find most suitable interface to send forward
         @params
@@ -195,7 +197,7 @@ class Router(Machine):
             if compare_ip(row.ip_net, row.ip_mask, dest_ip):
                 try:
                     next_mach = self.interfaces_table[row.interface]
-                    next_mach.take_packet(packet)
+                    next_mach.take_packet(packet, test_dict)
                 except KeyError:
                     time_now: str = datetime.now().strftime("%d-%m-%Y/%H:%M")
                     self.log.append(f'[{time_now}] No connected device at {row.interface} \
@@ -205,7 +207,7 @@ class Router(Machine):
         #if there are no suitable devices:
         dg: str = self.default_gateway
         try:
-            self.interfaces_table[dg].take_packet(packet)
+            self.interfaces_table[dg].take_packet(packet, test_dict)
         except KeyError:
             time_now: str = datetime.now().strftime("%d-%m-%Y/%H:%M")
             self.log.append(f'[{time_now}] No connected device at {dg} interface')
@@ -236,15 +238,15 @@ class Switcher(Machine):
 
 
     @overrides
-    def take_packet(self, packet: dict):
+    def take_packet(self, packet: dict, test_dict: Optional[dict] = None):
         try:
             ip_addr: str = packet['to_ip']
             interface: str = self.switch_table[ip_addr]
             device = self.interfaces_table[interface]
-            device.take_packet(packet)
+            device.take_packet(packet, test_dict)
         except KeyError:
             #send to default gateway
-            self.gateway.take_packet(packet)
+            self.gateway.take_packet(packet, test_dict)
             #time_now: str = datetime.now().strftime("%d-%m-%Y/%H:%M")
             #self.log.append(f'[{time_now}] No connected device or wrong packet')
 
@@ -303,3 +305,15 @@ class PostServer(Machine):
         
         new_letter = self.Letter('new', title, sender, recipient, text, date)
         self.mail.append(new_letter)
+
+
+class DNSResolver(Machine):
+    '''
+    '''
+    def __init__(self):
+        pass
+
+
+    @overrides
+    def take_packet(self, packet: dict, test_dict: Optional[dict] = None):
+        pass

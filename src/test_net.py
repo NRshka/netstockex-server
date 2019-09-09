@@ -29,6 +29,10 @@ if __name__ == "__main__":
     s1.set_gateway(r1)
     s2 = Switcher(net_addr=[12, 16, 87, 0], net_mask=mask, name='Switcher2')
     s2.set_gateway(r2)
+    s3 = Switcher(net_addr=[64, 27, 55, 0], net_mask=mask, name='Switcher3')
+
+    p1 = PostServer()
+    p1.set_gateway()
 
     m1ip = [192, 168, 44, 82]
     m2ip = [12, 16, 87, 16]

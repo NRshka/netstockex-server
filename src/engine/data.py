@@ -36,6 +36,20 @@ class Packet:
         return string_form
 
 
+    def __eq__(self, another):
+        if not type(another) == type(self):
+            return False
+
+        for key in self.__dict__:
+            try:
+                if not (self.__dict__[key] == another.__dict__[key]):
+                    return False
+            except KeyError:
+                return False
+
+        return True
+
+
 @dataclass
 class Letter:
     title: str
