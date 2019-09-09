@@ -1,11 +1,20 @@
 from datetime import datetime
+from random import choice
+from string import ascii_letters
 
 
 from engine import *
 
 
+def generate_text(length: int) -> str:
+    s = ''
+    for i in range(length):
+        s += choice(ascii_letters + ' ')
+    return s
+
 
 if __name__ == "__main__":
+    count_endpoints = 3
     mask = [255, 255, 255, 0]
 
     m1 = Machine(21*1e5, 1, 1024, 10240, 8*1024*100, 80*1024**3, name='Machine1')
@@ -50,13 +59,29 @@ if __name__ == "__main__":
     r2.add_trace(m2ip, mask, 'eth1')
 
 
-    p1 = Packet(data=b'First packet', from_ip='.'.join([str(i) for i in m1ip]), from_port='6886',
-                dest_ip='.'.join([str(i) for i in m2ip]), dest_port='1337')
-    p2 = Packet(data=b'Second packet', from_ip='.'.join([str(i) for i in m2ip]), from_port='1337',
-                dest_ip='.'.join([str(i) for i in m1ip]), dest_port='6886')
+    #p1 = Packet(data=b'First packet', from_ip='.'.join([str(i) for i in m1ip]), from_port='6886',
+    #            dest_ip='.'.join([str(i) for i in m2ip]), dest_port='1337')
+    #p2 = Packet(data=b'Second packet', from_ip='.'.join([str(i) for i in m2ip]), from_port='1337',
+    #            dest_ip='.'.join([str(i) for i in m1ip]), dest_port='6886')
+    #p3 = Packet(data=b'Third packet')
+    ip_ads = [m1ip, m2ip, m3ip]
+    machines = [m1, m2, m3]
+    packets = []
+    test_dict = {}
+    for i in range(count_endpoints):
+        for j in range(count_endpoints):
+            if i == j:
+                continue
 
-    m1.send_packet(p1.__dict__)
-    m2.send_packet(p2.__dict__)
+            packet = Packet(
+                data=bytes(str(i+1)+' to '+str(j+1), 'utf-8'),
+                from_ip='.'.join([str(ip) for ip in ip_ads[i]]),
+                from_port='6468',
+                dest_ip='.'.join([str(ip) for ip in ip_ads[j]]),
+                dest_port='1111'
+            )
+            machines[i].send_packet(packet.__dict__, test_dict)
+            assert test_dict['packet'] == packet.__dict__ and test_dict['recipient'] == machines[j]
 
 
     l1 = Letter(
