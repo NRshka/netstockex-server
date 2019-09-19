@@ -5,7 +5,7 @@
 Частота измеряется в герцах
 @author ADT
 '''
-from typing import List, Optional
+from typing import List, Optional, Dict
 from collections import namedtuple
 from datetime import datetime
 from overrides import overrides
@@ -278,7 +278,9 @@ class PostServer(Machine):
     def __init__(self):
         super().__init__(21*1e5, 1, 1024, 10240, 8*1024*100, 80*1024**3)
         self.Letter = namedtuple('Letter', 'status title sender recipient text date')
-        self.mail = []
+        self.mail = {}#recipient address: [Letter]
+        self.post_ips: Dict[str, str] = {}#ip address of other mail server
+        self.dns_ip = {}#addresses of dns servers
 
 
     @overrides
@@ -292,28 +294,74 @@ class PostServer(Machine):
         if packet['to_ip'] != self.ip_addr or self.ports[port] is None:
             return
 
-        things: List[bytes] = packet['data'].split(b'\0')
         try:
+            things: List[bytes] = packet['data'].split(b'\0')
             title: str = str(things[0], 'utf-8')
             sender: str = str(things[1], 'utf-8')
             recipient: str = str(things[2], 'utf-8')
             text: str = str(things[3], 'utf-8')
             date: str = str(things[4], 'utf-8')
-        except IndexError:
+        except (IndexError, KeyError):
             #error in protocol, drop
             return
         
         new_letter = self.Letter('new', title, sender, recipient, text, date)
-        self.mail.append(new_letter)
+        self.mail[recipient].append(new_letter)
+
+
+    def send_mail(self, letter: dict) -> int:
+        recip_server_name: str = ''
+        try:
+            recip_server_name = letter['recipient'].split('@')[1]
+        except KeyError:
+            return -1
+
+        try:
+            ip_addr = self.post_ips[recip_server_name]
+            
 
 
 class DNSResolver(Machine):
     '''
     '''
     def __init__(self):
-        pass
+        self.table = {}
+        self.table['mx'] = {}
+
+
+    def add_entree(self, req:str, names:List[str], ip_list: List[str]):
+        '''
+        '''
+        for name in names:
+            try:
+                for ip in ip_list:
+                    self.table[req][name].append(ip)
+            except KeyError:
+                self.table[req][name] = []
+                for ip in ip_list:
+                    self.table[req][name].append(ip)
 
 
     @overrides
     def take_packet(self, packet: dict, test_dict: Optional[dict] = None):
-        pass
+        req: bytes = b''
+        address: bytes = b''
+        key: bytes = b''
+        try:
+            things: List[bytes] = packet['data'].split(b'\0')
+            req = things[0]
+            address = things[1]
+            key = things[2]
+        except (IndexError, KeyError):
+            return
+
+        try:
+            resp: bytes = self.table[req][address]
+            data: bytes = b'\0'.join([resp, key])
+            answer = {k: packet[k] for k in packet if k != 'data'}
+            answer['data'] = data
+            self.gateway.take_packet(answer)
+        except KeyError:
+            #this dns server doesn't know
+            pass
+
