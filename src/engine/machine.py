@@ -318,7 +318,10 @@ class PostServer(Machine):
 
         try:
             ip_addr = self.post_ips[recip_server_name]
-            
+        except:
+            #send requese to dns server to find ip address of post server
+            pass
+
 
 
 class DNSResolver(Machine):
