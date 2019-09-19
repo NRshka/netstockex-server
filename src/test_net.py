@@ -13,6 +13,22 @@ def generate_text(length: int) -> str:
     return s
 
 
+def generate_dns_request(type_req: str, addr: str, resolver: str, from_ip: str) -> bytes:
+    packet: dict = {}
+    packet['from_ip'] = from_ip
+    packet['to_ip'] = resolver
+
+    data: bytes = b''
+    data += bytes(type_req, 'utf-8') + b'\0'
+    data += bytes(addr, 'utf-8') + b'\0'
+    key: str = generate_text(16)
+    data += bytes(key, 'utf-8')
+
+    packet['data'] = data
+
+    return packet
+
+
 if __name__ == "__main__":
     count_endpoints = 3
     mask = [255, 255, 255, 0]
@@ -31,6 +47,10 @@ if __name__ == "__main__":
     s2.set_gateway(r2)
     s3 = Switcher(net_addr=[64, 27, 55, 0], net_mask=mask, name='Switcher3')
 
+    d1 = DNSResolver()
+    d1.add_entry(b'mx', [b'mailmaster'], [b'12.16.87.15'])
+    d1.set_gateway(s1)
+
     p1 = PostServer()
     #p1.set_gateway()
 
@@ -46,6 +66,7 @@ if __name__ == "__main__":
 
     s1.connect_machine('eth1', m1, '.'.join([str(i) for i in m1ip]))
     s1.connect_machine('eth2', m3, '.'.join([str(i) for i in m3ip]))
+    s1.connect_machine('eth3', d1, '192.168.44.81')
     s1.connect_machine('eth0', r1)
 
     r1.connect_machine('eth0', r2)
@@ -63,6 +84,8 @@ if __name__ == "__main__":
     r2.add_trace(m2ip, mask, 'eth1')
 
 
+    dns_req: bytes = generate_dns_request('mx', 'mailmaster', '192.168.44.81', '.'.join([str(i) for i in m1ip]))
+    m1.send_packet(dns_req)
     #p1 = Packet(data=b'First packet', from_ip='.'.join([str(i) for i in m1ip]), from_port='6886',
     #            dest_ip='.'.join([str(i) for i in m2ip]), dest_port='1337')
     #p2 = Packet(data=b'Second packet', from_ip='.'.join([str(i) for i in m2ip]), from_port='1337',
@@ -96,6 +119,7 @@ if __name__ == "__main__":
         date=datetime.now().strftime("%d-%m-%Y/%H:%M")
     )
     l1bytes = bytes(str(l1), 'utf-8')
+
     l2 = Letter(
         title='First email',
         sender='machine1@mailmaster.com',

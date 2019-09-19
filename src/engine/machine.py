@@ -318,6 +318,10 @@ class PostServer(Machine):
 
         try:
             ip_addr = self.post_ips[recip_server_name]
+            letter['from'] = '.'.join(self.ip_addr)
+            letter['to'] = ip_addr
+            data = b'\0'.join([bytes(letter[field], 'utf-8') for field in letter])
+            self.gateway.take_packet(data)
         except:
             #send requese to dns server to find ip address of post server
             pass
@@ -329,12 +333,17 @@ class DNSResolver(Machine):
     '''
     def __init__(self):
         self.table = {}
-        self.table['mx'] = {}
+        self.table[b'mx'] = {}
 
 
-    def add_entree(self, req:str, names:List[str], ip_list: List[str]):
+    def add_entry(self, req:bytes, names:List[bytes], ip_list: List[bytes]):
         '''
         '''
+        try:
+            a = self.table[req]
+        except KeyError:
+            self.table[req] = {}
+
         for name in names:
             try:
                 for ip in ip_list:
@@ -359,10 +368,15 @@ class DNSResolver(Machine):
             return
 
         try:
-            resp: bytes = self.table[req][address]
+            resp: bytes = self.table[req][address][0]
             data: bytes = b'\0'.join([resp, key])
-            answer = {k: packet[k] for k in packet if k != 'data'}
+            #answer = {k: packet[k] for k in packet if k != 'data'}
+            answer = {
+                'from_ip': packet['to_ip'],
+                'to_ip': packet['from_ip']
+            }
             answer['data'] = data
+            #TODO process the case whe gateway isn't set
             self.gateway.take_packet(answer)
         except KeyError:
             #this dns server doesn't know
