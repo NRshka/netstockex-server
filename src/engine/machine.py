@@ -65,23 +65,42 @@ def get_new_ip(net_addr: List[int], count: int) -> List[int]:
     return new_addr
 
 
+class NonNegativeDesc:
+    '''
+    Descriptor class to set non negative numeric values
+    '''
+    def __get__(self, instance, owner):
+        return instance.__dict__[self.name]
+
+    def __set__(self, instance, value):
+        #if the value isn't numeric it'll rise TypeError
+        #because python can't do non numeric < 0
+        #if it implemented into class - class must to provide numeric things
+        if value < 0:
+            raise ValueError("Can't be negative")
+
+        instance.__dict__[self.name] = value
+
+    def __set_name__(self, owner, name):
+        self.name = name
+
+
 class Machine:
     '''
     Clss of user machine to do any calculations
     '''
+    hz = NonNegativeDesc()
+    threads = NonNegativeDesc()
+    ram_mem = NonNegativeDesc()
+    storage_mem = NonNegativeDesc()
+    storage_speed = NonNegativeDesc()
+    net_speed = NonNegativeDesc()
     # pylint: disable=too-many-instance-attributes
     def __init__(self, hz: int, threads: int, ram_mem: int,
                 storage_mem: int, storage_speed: int, net_speed: int,
                 name: Optional[str] = None):
         
         self.name = name
-
-        assert hz > 0
-        assert threads > 0
-        assert ram_mem > 0
-        assert storage_mem > 0
-        assert storage_speed > 0
-        assert net_speed > 0
 
         self.hz = hz
         self.threads = threads
