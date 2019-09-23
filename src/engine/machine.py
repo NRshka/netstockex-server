@@ -6,10 +6,11 @@
 @author ADT
 '''
 import time
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 from collections import namedtuple
 from datetime import datetime
 from overrides import overrides
+from dataclasses import dataclass
 
 
 current_millisecs_time = lambda: int(round(time.time() * 1000))
@@ -69,7 +70,14 @@ def get_new_ip(net_addr: List[int], count: int) -> List[int]:
     return new_addr
 
 
-Batch = namedtuple('Batch', ['item', 'passed', 'time'])
+#Batch = namedtuple('Batch', ['item', 'passed', 'time', 'delegate', 'args'])
+@dataclass
+class Batch:
+    item: object
+    passed: int
+    time: int
+    delegate: Any
+    args: dict
 
 
 class Pump:
@@ -81,7 +89,17 @@ class Pump:
         self.processing: list = []
         self.time_last_pumping: int = current_millisecs_time()
 
-    def spit(self, item, consuming_time):
+
+    def spit(self, batch):
+        assert batch.time >= 0, ValueError("Can't be negative")
+
+        if batch.time > 0:
+            self.coming.append(batch)
+        else:#time == 0
+            self.processing.append(item)
+
+
+    def spit_item(self, item, consuming_time):
         assert consuming_time >= 0, ValueError("Can't be negative")
 
         if consuming_time > 0:
@@ -89,21 +107,25 @@ class Pump:
         else:#time == 0
             self.processing.append(item)
 
+
     def pump(self):
         '''
         '''
         # I use the while loop here because
         # the container cannot be changed in the for loop
         # it can lead to IndexError.
-        delta_time: int = current_millisecs_time() - self.time_last_pumping
+        current_time: int = current_millisecs_time()
+        delta_time: int = current_time - self.time_last_pumping
+        self.time_last_pumping = current_time
 
         ind = 0
-        while ind < self.coming.__len__:
+        while ind < len(self.coming):
             batch = self.coming[ind]
             batch.passed += delta_time
-            if batch.passed <= batch.time:
+            if batch.passed >= batch.time:
                 self.coming.remove(batch)
                 self.processing.append(batch)
+                batch.delegate(**batch.args)
             else:
                 ind += 1
 
@@ -202,8 +224,13 @@ class Machine(Pump):
     def send_packet(self, packet: dict, test_dict: Optional[dict]=None):
         '''
         Low-level method shouldn't be used by users
+        Should Add command "send packet" to pumping
         '''
-        self.gateway.take_packet(packet, test_dict)
+        send_command = Batch(packet, 0, 10000, self.gateway.take_packet, dict(
+            packet=packet, test_dict=test_dict
+        ))
+        self.spit(send_command)
+        #self.gateway.take_packet(packet, test_dict)
 
 
     def add_program(self, data, program: list) -> int:

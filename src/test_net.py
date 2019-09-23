@@ -86,7 +86,7 @@ if __name__ == "__main__":
 
 
     dns_req: bytes = generate_dns_request('mx', 'mailmaster', '192.168.44.81', '.'.join([str(i) for i in m1ip]))
-    m1.send_packet(dns_req)
+    #m1.send_packet(dns_req)
     #p1 = Packet(data=b'First packet', from_ip='.'.join([str(i) for i in m1ip]), from_port='6886',
     #            dest_ip='.'.join([str(i) for i in m2ip]), dest_port='1337')
     #p2 = Packet(data=b'Second packet', from_ip='.'.join([str(i) for i in m2ip]), from_port='1337',
@@ -109,6 +109,8 @@ if __name__ == "__main__":
                 dest_port='1111'
             )
             machines[i].send_packet(packet.__dict__, test_dict)
+            while len(machines[i].coming) > 0:
+                machines[i].pump()
             assert test_dict['packet'] == packet.__dict__
             assert test_dict['recipient'] == machines[j]
 
