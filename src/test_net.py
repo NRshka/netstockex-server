@@ -1,3 +1,4 @@
+import objgraph
 from datetime import datetime
 from random import choice
 from string import ascii_letters
@@ -108,7 +109,8 @@ if __name__ == "__main__":
                 dest_port='1111'
             )
             machines[i].send_packet(packet.__dict__, test_dict)
-            assert test_dict['packet'] == packet.__dict__ and test_dict['recipient'] == machines[j]
+            assert test_dict['packet'] == packet.__dict__
+            assert test_dict['recipient'] == machines[j]
 
 
     l1 = Letter(
@@ -129,4 +131,6 @@ if __name__ == "__main__":
     )
     l2bytes = bytes(str(l2), 'utf-8')
 
-
+    roots = objgraph.get_leaking_objects()
+    print(len(roots))
+    objgraph.show_most_common_types(objects=roots)

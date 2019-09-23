@@ -5,10 +5,14 @@
 Частота измеряется в герцах
 @author ADT
 '''
+import time
 from typing import List, Optional, Dict
 from collections import namedtuple
 from datetime import datetime
 from overrides import overrides
+
+
+current_millisecs_time = lambda: int(round(time.time() * 1000))
 
 
 def compare_ip(ip_net: List[int], mask_net: List[int], dest_ip: List[int]) -> bool:
@@ -18,7 +22,7 @@ def compare_ip(ip_net: List[int], mask_net: List[int], dest_ip: List[int]) -> bo
     ip_net: list of str, ipv4 or ipv6 address of subnetwork
     mask_net: list of str, same sort of ip_net, mask of net (orly?)
     dest_ip: ip address of destination, has same sort as previous things
-    @returns
+    @return
     True if ip address refers to subnetwork else False
     '''
     if len(ip_net) != len(mask_net):
@@ -39,7 +43,7 @@ def apply_mask(ip_net: List[int], net_mask: List[int]) -> List[int]:
     @params
     ip_net: ip address of computer
     net_mask: mask of network
-    @returns
+    @return
     ip address of network
     '''
     assert len(ip_net) == len(net_mask)
@@ -65,6 +69,45 @@ def get_new_ip(net_addr: List[int], count: int) -> List[int]:
     return new_addr
 
 
+Batch = namedtuple('Batch', ['item', 'passed', 'time'])
+
+
+class Pump:
+    coming: list
+    processing: list
+    time_last_pumping: int
+    def __init__(self):
+        self.coming: list = []
+        self.processing: list = []
+        self.time_last_pumping: int = current_millisecs_time()
+
+    def spit(self, item, consuming_time):
+        assert consuming_time >= 0, ValueError("Can't be negative")
+
+        if consuming_time > 0:
+            self.coming.append(Batch(item, 0, consuming_time))
+        else:#time == 0
+            self.processing.append(item)
+
+    def pump(self):
+        '''
+        '''
+        # I use the while loop here because
+        # the container cannot be changed in the for loop
+        # it can lead to IndexError.
+        delta_time: int = current_millisecs_time() - self.time_last_pumping
+
+        ind = 0
+        while ind < self.coming.__len__:
+            batch = self.coming[ind]
+            batch.passed += delta_time
+            if batch.passed <= batch.time:
+                self.coming.remove(batch)
+                self.processing.append(batch)
+            else:
+                ind += 1
+
+
 class NonNegativeDesc:
     '''
     Descriptor class to set non negative numeric values
@@ -73,9 +116,9 @@ class NonNegativeDesc:
         return instance.__dict__[self.name]
 
     def __set__(self, instance, value):
-        #if the value isn't numeric it'll rise TypeError
-        #because python can't do non numeric < 0
-        #if it implemented into class - class must to provide numeric things
+        # if the value isn't numeric it'll rise TypeError
+        # because python can't do non numeric < 0
+        # if it implemented into class - class must to provide numeric things
         if value < 0:
             raise ValueError("Can't be negative")
 
@@ -85,7 +128,7 @@ class NonNegativeDesc:
         self.name = name
 
 
-class Machine:
+class Machine(Pump):
     '''
     Clss of user machine to do any calculations
     '''
@@ -95,11 +138,13 @@ class Machine:
     storage_mem = NonNegativeDesc()
     storage_speed = NonNegativeDesc()
     net_speed = NonNegativeDesc()
-    # pylint: disable=too-many-instance-attributes
+    # pylint: disable=too-many-arguments
     def __init__(self, hz: int, threads: int, ram_mem: int,
                 storage_mem: int, storage_speed: int, net_speed: int,
                 name: Optional[str] = None):
         
+        super().__init__()
+
         self.name = name
 
         self.hz = hz
@@ -109,6 +154,9 @@ class Machine:
         self.storage_mem = storage_mem
         self.net_speed = net_speed
 
+        self.gateway = None
+        self.ip_addr = None
+        self.net_mask = None
         self.ports = [None for _ in range(2**16)]
 
         self.queue: List[list] = []
@@ -126,6 +174,7 @@ class Machine:
         ones = [255 for _ in range(len(ip_addr))]
         last_addr = [a^b for a, b in zip(ones, net_mask)]
         self.broadcast: List[int] = [a|b for a, b in zip(ip_addr, last_addr)]
+        self.gateway = gateway
 
 
     def set_gateway(self, gateway):
@@ -138,7 +187,7 @@ class Machine:
         a socket associated with the port of destination
         @params
         packet: dict with headers
-        @returns
+        @return
         None
         '''
 
@@ -163,7 +212,7 @@ class Machine:
         @params
         data: data to ru program
         program: list of commands
-        @returns seconds
+        @return seconds
         '''
         for command in program:
             pass
@@ -185,7 +234,7 @@ class Router(Machine):
         ip_net: ip net of subnetwork
         ip_mask: ipv4/ipv6 address like [12, 10, 64, 14]
         interface: str, means gate where to kick packet to get destination
-        @returns
+        @return
         count of existing entries as result of this function
         '''
 
@@ -205,7 +254,7 @@ class Router(Machine):
         Find packet and find most suitable interface to send forward
         @params
         packet: dict, iternet packet with headers
-        @returns
+        @return
         None
         '''
         str_f_ip: List[str] = packet['to_ip'].split('.')
@@ -236,6 +285,7 @@ class Switcher(Machine):
     '''
     Switcher to route packets in subnetwork
     '''
+    #pylint disable=too-many-instance-attributes
     def __init__(self, net_addr: List[int], net_mask: List[int], name: Optional[str]=None):
         super().__init__(21*1e5, 1, 1024, 10240, 8*1024*100, 80*1024**3, name=name)
         self.switch_table = {}#'192.168.1.92': 'eth1' form
@@ -303,7 +353,7 @@ class PostServer(Machine):
 
 
     @overrides
-    def take_packet(self, packet: dict):
+    def take_packet(self, packet: dict, test_dict: Optional[dict]=None):
         '''
         Take packet in form of post mail
         If protocol not corfimed log it
@@ -349,8 +399,10 @@ class PostServer(Machine):
 
 class DNSResolver(Machine):
     '''
+    Adds an address entry to the ip address, creates an entry if it did not exist.
     '''
     def __init__(self):
+        super().__init__(21*1e5, 1, 1024, 10240, 8*1024*100, 80*1024**3)
         self.table = {}
         self.table[b'mx'] = {}
 
@@ -359,18 +411,18 @@ class DNSResolver(Machine):
         '''
         '''
         try:
-            a = self.table[req]
+            self.table[req]
         except KeyError:
             self.table[req] = {}
 
         for name in names:
             try:
-                for ip in ip_list:
-                    self.table[req][name].append(ip)
+                for ip_addr in ip_list:
+                    self.table[req][name].append(ip_addr)
             except KeyError:
                 self.table[req][name] = []
-                for ip in ip_list:
-                    self.table[req][name].append(ip)
+                for ip_addr in ip_list:
+                    self.table[req][name].append(ip_addr)
 
 
     @overrides
@@ -400,4 +452,3 @@ class DNSResolver(Machine):
         except KeyError:
             #this dns server doesn't know
             pass
-
