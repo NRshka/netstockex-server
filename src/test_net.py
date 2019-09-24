@@ -39,8 +39,8 @@ if __name__ == "__main__":
     m3 = Machine(21*1e5, 1, 1024, 10240, 8*1024*100, 80*1024**3, name='Machine3')
     m4 = Machine(21*1e5, 1, 1024, 10240, 8*1024*100, 80*1024**3, name='Machine4')
 
-    r1 = Router('eth0')
-    r2 = Router('eth0')
+    r1 = Router('eth0', name='Router1')
+    r2 = Router('eth0', name='Router2')
 
     s1 = Switcher(net_addr=[192, 168, 44, 0], net_mask=mask, name='Switcher1')
     s1.set_gateway(r1)
@@ -95,12 +95,14 @@ if __name__ == "__main__":
     ip_ads = [m1ip, m2ip, m3ip]
     machines = [m1, m2, m3]
     packets = []
-    test_dict = {}
+    all_devices = [m1, m2, m3, m4, r1, r2, s1, s2]
     for i in range(count_endpoints):
         for j in range(count_endpoints):
             if i == j:
                 continue
 
+            print(f'-----------------Trying to send packet from {i+1} to {j+1}')
+            test_dict = {}
             packet = Packet(
                 data=bytes(str(i+1)+' to '+str(j+1), 'utf-8'),
                 from_ip='.'.join([str(ip) for ip in ip_ads[i]]),
@@ -109,8 +111,15 @@ if __name__ == "__main__":
                 dest_port='1111'
             )
             machines[i].send_packet(packet.__dict__, test_dict)
-            while len(machines[i].coming) > 0:
-                machines[i].pump()
+
+            IS_NEED_PUMP = True
+            while IS_NEED_PUMP:
+                IS_NEED_PUMP = False
+                for device in all_devices:
+                    if len(device.coming) > 0:
+                        IS_NEED_PUMP = True
+                        device.pump()
+
             assert test_dict['packet'] == packet.__dict__
             assert test_dict['recipient'] == machines[j]
 

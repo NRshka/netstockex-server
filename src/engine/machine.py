@@ -13,6 +13,7 @@ from overrides import overrides
 from dataclasses import dataclass
 
 
+TIME_TRANS = 1000
 current_millisecs_time = lambda: int(round(time.time() * 1000))
 
 
@@ -96,7 +97,7 @@ class Pump:
         if batch.time > 0:
             self.coming.append(batch)
         else:#time == 0
-            self.processing.append(item)
+            self.processing.append(batch)
 
 
     def spit_item(self, item, consuming_time):
@@ -226,7 +227,7 @@ class Machine(Pump):
         Low-level method shouldn't be used by users
         Should Add command "send packet" to pumping
         '''
-        send_command = Batch(packet, 0, 10000, self.gateway.take_packet, dict(
+        send_command = Batch(packet, 0, TIME_TRANS, self.gateway.take_packet, dict(
             packet=packet, test_dict=test_dict
         ))
         self.spit(send_command)
@@ -246,13 +247,14 @@ class Machine(Pump):
 
 
 class Router(Machine):
-    def __init__(self, default_gateway: str):
+    def __init__(self, default_gateway: str, name: Optional[str] = None):
         super().__init__(21*1e5, 1, 1024, 10240, 8*1024*100, 80*1024**3)
         self.IP_row = namedtuple('IP_row', 'ip_net ip_mask interface')
         self.ip_table = []
         self.interfaces_table = {}#matching table of name of interface and Router class
         self.log = []#log of errors
         self.default_gateway = default_gateway
+        self.name = name
 
     def add_trace(self, ip_net: List[int], ip_mask: List[int], interface: str) -> int:
         '''
@@ -292,7 +294,12 @@ class Router(Machine):
             if compare_ip(row.ip_net, row.ip_mask, dest_ip):
                 try:
                     next_mach = self.interfaces_table[row.interface]
-                    next_mach.take_packet(packet, test_dict)
+                    batch = Batch(packet, 0, TIME_TRANS, next_mach.take_packet, dict(
+                        packet=packet, test_dict=test_dict
+                    ))
+                    self.spit(batch)
+                    print('\n', self.name, self.coming, '\n')
+                    #next_mach.take_packet(packet, test_dict)
                 except KeyError:
                     time_now: str = datetime.now().strftime("%d-%m-%Y/%H:%M")
                     self.log.append(f'[{time_now}] No connected device at {row.interface} \
