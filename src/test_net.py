@@ -101,7 +101,6 @@ if __name__ == "__main__":
             if i == j:
                 continue
 
-            print(f'-----------------Trying to send packet from {i+1} to {j+1}')
             test_dict = {}
             packet = Packet(
                 data=bytes(str(i+1)+' to '+str(j+1), 'utf-8'),

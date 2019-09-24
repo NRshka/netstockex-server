@@ -215,8 +215,6 @@ class Machine(Pump):
         '''
 
         port = packet['to_port']
-        print(self.name, ':')
-        print(packet)
         test_dict['packet'] = packet
         test_dict['recipient'] = self
         #if self.ports[]
@@ -298,7 +296,6 @@ class Router(Machine):
                         packet=packet, test_dict=test_dict
                     ))
                     self.spit(batch)
-                    print('\n', self.name, self.coming, '\n')
                     #next_mach.take_packet(packet, test_dict)
                 except KeyError:
                     time_now: str = datetime.now().strftime("%d-%m-%Y/%H:%M")
@@ -309,6 +306,7 @@ class Router(Machine):
         #if there are no suitable devices:
         dg: str = self.default_gateway
         try:
+            #TODO spit for pumping
             self.interfaces_table[dg].take_packet(packet, test_dict)
         except KeyError:
             time_now: str = datetime.now().strftime("%d-%m-%Y/%H:%M")
@@ -346,7 +344,11 @@ class Switcher(Machine):
             ip_addr: str = packet['to_ip']
             interface: str = self.switch_table[ip_addr]
             device = self.interfaces_table[interface]
-            device.take_packet(packet, test_dict)
+            batch = Batch(packet, 0, TIME_TRANS, device.take_packet, dict(
+                packet=packet, test_dict=test_dict
+            ))
+            self.spit(batch)
+            #device.take_packet(packet, test_dict)
         except KeyError:
             #send to default gateway
             self.gateway.take_packet(packet, test_dict)
