@@ -1,17 +1,18 @@
-import objgraph
 from datetime import datetime
 from random import choice
 from string import ascii_letters
+import objgraph
 
 
-from engine import *
+from engine import Machine, Switcher, Router, DNSResolver, PostServer
+from engine import Packet, Letter
 
 
 def generate_text(length: int) -> str:
-    s = ''
+    string = ''
     for i in range(length):
-        s += choice(ascii_letters + ' ')
-    return s
+        string += choice(ascii_letters + ' ')
+    return string
 
 
 def generate_dns_request(type_req: str, addr: str, resolver: str, from_ip: str) -> bytes:
@@ -34,10 +35,10 @@ if __name__ == "__main__":
     count_endpoints = 3
     mask = [255, 255, 255, 0]
 
-    m1 = Machine(21*1e5, 1, 1024, 10240, 8*1024*100, 80*1024**3, name='Machine1')
-    m2 = Machine(21*1e5, 1, 1024, 10240, 8*1024*100, 80*1024**3, name='Machine2')
-    m3 = Machine(21*1e5, 1, 1024, 10240, 8*1024*100, 80*1024**3, name='Machine3')
-    m4 = Machine(21*1e5, 1, 1024, 10240, 8*1024*100, 80*1024**3, name='Machine4')
+    machine1 = Machine(21*1e5, 1, 1024, 10240, 8*1024*100, 80*1024**3, name='machine1')
+    machine2 = Machine(21*1e5, 1, 1024, 10240, 8*1024*100, 80*1024**3, name='Machine2')
+    machine3 = Machine(21*1e5, 1, 1024, 10240, 8*1024*100, 80*1024**3, name='Machine3')
+    machine4 = Machine(21*1e5, 1, 1024, 10240, 8*1024*100, 80*1024**3, name='Machine4')
 
     r1 = Router('eth0', name='Router1')
     r2 = Router('eth0', name='Router2')
@@ -58,15 +59,15 @@ if __name__ == "__main__":
     m1ip = [192, 168, 44, 82]
     m2ip = [12, 16, 87, 16]
     m3ip = [192, 168, 44, 83]
-    m1.set_net_data(m1ip, mask, s1)
-    m2.set_net_data(m2ip, mask, s2)
-    m3.set_net_data(m3ip, mask, s1)
-    m1.set_gateway(s1)
-    m2.set_gateway(s2)
-    m3.set_gateway(s1)
+    machine1.set_net_data(m1ip, mask, s1)
+    machine2.set_net_data(m2ip, mask, s2)
+    machine3.set_net_data(m3ip, mask, s1)
+    machine1.set_gateway(s1)
+    machine2.set_gateway(s2)
+    machine3.set_gateway(s1)
 
-    s1.connect_machine('eth1', m1, '.'.join([str(i) for i in m1ip]))
-    s1.connect_machine('eth2', m3, '.'.join([str(i) for i in m3ip]))
+    s1.connect_machine('eth1', machine1, '.'.join([str(i) for i in m1ip]))
+    s1.connect_machine('eth2', machine3, '.'.join([str(i) for i in m3ip]))
     s1.connect_machine('eth3', d1, '192.168.44.81')
     s1.connect_machine('eth0', r1)
 
@@ -77,7 +78,7 @@ if __name__ == "__main__":
     r2.connect_machine('eth1', s2)
 
     s2.connect_machine('eth0', r2)
-    s2.connect_machine('eth1', m2, '.'.join([str(i) for i in m2ip]))
+    s2.connect_machine('eth1', machine2, '.'.join([str(i) for i in m2ip]))
 
     r1.add_trace(m2ip, mask, 'eth0')
     r1.add_trace(m1ip, mask, 'eth1')
@@ -85,17 +86,20 @@ if __name__ == "__main__":
     r2.add_trace(m2ip, mask, 'eth1')
 
 
-    dns_req: bytes = generate_dns_request('mx', 'mailmaster', '192.168.44.81', '.'.join([str(i) for i in m1ip]))
-    #m1.send_packet(dns_req)
+    ip_from: str = '192.168.44.81'
+    ip_to: str = '.'.join([str(i) for i in m1ip])
+    host_addr: str = 'mailmaster'
+    dns_req: bytes = generate_dns_request('mx', host_addr, ip_from, ip_to)
+    #machine1.send_packet(dns_req)
     #p1 = Packet(data=b'First packet', from_ip='.'.join([str(i) for i in m1ip]), from_port='6886',
     #            dest_ip='.'.join([str(i) for i in m2ip]), dest_port='1337')
     #p2 = Packet(data=b'Second packet', from_ip='.'.join([str(i) for i in m2ip]), from_port='1337',
     #            dest_ip='.'.join([str(i) for i in m1ip]), dest_port='6886')
     #p3 = Packet(data=b'Third packet')
     ip_ads = [m1ip, m2ip, m3ip]
-    machines = [m1, m2, m3]
+    machines = [machine1, machine2, machine3]
     packets = []
-    all_devices = [m1, m2, m3, m4, r1, r2, s1, s2]
+    all_devices = [machine1, machine2, machine3, machine4, r1, r2, s1, s2]
     for i in range(count_endpoints):
         for j in range(count_endpoints):
             if i == j:
@@ -111,12 +115,13 @@ if __name__ == "__main__":
             )
             machines[i].send_packet(packet.__dict__, test_dict)
 
-            IS_NEED_PUMP = True
-            while IS_NEED_PUMP:
-                IS_NEED_PUMP = False
+            is_need_to_pump = True
+            while is_need_to_pump:
+                is_need_to_pump = False
                 for device in all_devices:
-                    if len(device.coming) > 0:
-                        IS_NEED_PUMP = True
+                    #do pumping if there are items in coming list
+                    if device.coming:
+                        is_need_to_pump = True
                         device.pump()
 
             assert test_dict['packet'] == packet.__dict__
